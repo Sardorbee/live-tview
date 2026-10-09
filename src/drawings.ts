@@ -427,8 +427,15 @@ export class Drawings {
     ctx.lineWidth = 1;
     ctx.strokeRect(x1 + 0.5, y1 + 0.5, x2 - x1, h);
     if (z.text) {
-      ctx.textAlign = 'left';
-      ctx.fillText(z.text, Math.max(x1, 0) + 4, y1 + h / 2);
+      // The label sits just above the box: centred over a zone, at the left end of a line.
+      // It drops inside the top edge when there is no room above.
+      const isLine = h <= 2;
+      const left = Math.max(x1, 0);
+      const right = Math.min(x2, pane.width);
+      const above = y1 - 8 >= 6;
+      ctx.globalAlpha = 0.95;
+      ctx.textAlign = isLine ? 'left' : 'center';
+      ctx.fillText(z.text, isLine ? left + 4 : (left + right) / 2, above ? y1 - 8 : y1 + 9);
     }
     ctx.globalAlpha = 1;
   }

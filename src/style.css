@@ -503,10 +503,22 @@ button {
   min-height: 0;
   overflow: hidden;
 }
-.inputs-card {
-  width: min(380px, 92vw);
+.modal-card.inputs-card {
+  width: min(420px, 92vw);
   padding: 16px 18px;
   gap: 10px;
+  /* scripts can declare dozens of inputs */
+  overflow-y: auto;
+}
+.inputs-card label {
+  flex: none;
+}
+.inputs-foot {
+  flex: none;
+  position: sticky;
+  bottom: -16px;
+  padding: 8px 0;
+  background: var(--panel);
 }
 .inputs-card h3 {
   margin: 0 0 4px;

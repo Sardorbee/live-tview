@@ -1,3 +1,7 @@
+import crtKillzones from '../indicators/crt-killzones.js?raw';
+import ifvg from '../indicators/ifvg.js?raw';
+import macroIct from '../indicators/macro-ict.js?raw';
+import taotSeparator from '../indicators/taot-separator.js?raw';
 import type { Bar, Timeframe } from './api';
 
 /**
@@ -247,15 +251,42 @@ indicator({
 });
 `;
 
-/** The saved scripts. A fresh browser starts with the fair value gap indicator. */
+/** Scripts that ship with the app. The sources of all but the first live in /indicators. */
+const BUILT_IN: Script[] = [
+  { id: 'fvg', name: 'Fair Value Gaps', source: FVG_SOURCE },
+  { id: 'ifvg', name: 'IFVG', source: ifvg },
+  { id: 'crt-killzones', name: 'CRT & Killzones', source: crtKillzones },
+  { id: 'taot-separator', name: 'TAOT separator', source: taotSeparator },
+  { id: 'macro-ict', name: 'Macro ICT', source: macroIct },
+];
+const SEEDED_KEY = 'tview.scripts.seeded';
+
+/**
+ * The saved scripts, topped up with any built-in one this browser has not been offered yet.
+ * Each built-in is offered once, so deleting one sticks, and one the user already has under
+ * the same name is not duplicated. Built-ins already in the library are never overwritten.
+ */
 export function loadScripts(): Script[] {
+  let list: Script[] | undefined;
+  let seeded: string[] = [];
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return (JSON.parse(raw) as Script[]).filter((s) => s && typeof s.id === 'string' && typeof s.source === 'string');
+    if (raw) list = (JSON.parse(raw) as Script[]).filter((s) => s && typeof s.id === 'string' && typeof s.source === 'string');
+    seeded = JSON.parse(localStorage.getItem(SEEDED_KEY) ?? '[]');
   } catch {
-    // fall through to the default set
+    // unreadable storage: start again from the built-ins
   }
-  return [{ id: 'fvg', name: 'Fair Value Gaps', source: FVG_SOURCE }];
+  // a library saved before built-ins were tracked was seeded with the fair value gap script only
+  if (list && !seeded.length) seeded = ['fvg'];
+  list ??= [];
+  for (const b of BUILT_IN) {
+    if (seeded.includes(b.id)) continue;
+    seeded.push(b.id);
+    if (!list.some((s) => s.id === b.id || s.name === b.name)) list.push({ ...b });
+  }
+  localStorage.setItem(SEEDED_KEY, JSON.stringify(seeded));
+  localStorage.setItem(KEY, JSON.stringify(list));
+  return list;
 }
 
 export const saveScripts = (list: Script[]) => localStorage.setItem(KEY, JSON.stringify(list));

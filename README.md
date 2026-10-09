@@ -63,7 +63,7 @@ indicator({
 });
 ```
 
-Available outputs are `plot()`, `marker()`, `hline()` and `box()`. A Fair Value Gaps indicator is included as an example. The template you get from **+ New** lists every helper.
+Available outputs are `plot()`, `marker()`, `hline()` and `box()`. Five scripts are included (Fair Value Gaps, IFVG, CRT & Killzones, TAOT separator, Macro ICT); the last four live in `indicators/` and are good starting points. The template you get from **+ New** lists every helper.
 
 ## Good to know
 
