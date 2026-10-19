@@ -1,5 +1,6 @@
 import * as signalR from '@microsoft/signalr';
 import { isLocal, localBars, localInfo, localTicks } from './localdata';
+import { isTv, tvBars, tvInfo, tvLatest, TvFeed } from './tradingview';
 
 const BASE = 'https://biquote.io';
 
@@ -19,6 +20,16 @@ export interface Tick {
   exchange?: string | null;
   marketState?: 'open' | 'closed';
   stale?: boolean;
+  /** seconds the quote lags the market (TradingView's delayed feeds); 0 or absent for real time */
+  delay?: number;
+}
+
+/** "Delayed 10 min" / "End-of-day data" for a lagging quote, or '' when it is real time. */
+export function delayLabel(t: Tick | undefined) {
+  const d = t?.delay ?? 0;
+  if (d <= 0) return '';
+  if (d >= 86400) return 'End-of-day data';
+  return `Delayed ${Math.max(1, Math.round(d / 60))} min`;
 }
 
 export interface SymbolInfo {
@@ -209,6 +220,7 @@ export interface BarSet {
 
 export async function fetchBars(symbol: string, tf: Timeframe): Promise<BarSet> {
   if (isLocal(symbol)) return localBars(symbol, tf);
+  if (isTv(symbol)) return tvBars(symbol, tf);
   const path = `/api/${encodeURIComponent(symbol)}`;
   if (isTickBased(tf)) {
     // the API keeps only a short tail of raw ticks, so these charts mostly build up live
@@ -258,15 +270,17 @@ export async function fetchBars(symbol: string, tf: Timeframe): Promise<BarSet> 
 
 /** Latest quotes. Imported symbols have no feed, so theirs are made up from the last stored bars. */
 export async function fetchLatest(symbols: string[]): Promise<Record<string, Tick>> {
-  const remote = symbols.filter((s) => !isLocal(s));
-  const [live, local] = await Promise.all([
+  const remote = symbols.filter((s) => !isLocal(s) && !isTv(s));
+  const [live, local, tv] = await Promise.all([
     remote.length ? get<Record<string, Tick>>('/api/latest', { symbols: remote, allowStale: true }) : {},
     localTicks(symbols.filter(isLocal)),
+    tvLatest(symbols.filter(isTv)),
   ]);
-  return { ...live, ...local };
+  return { ...live, ...local, ...tv };
 }
 
-export const fetchSymbol = (name: string) => (isLocal(name) ? localInfo(name) : get<SymbolInfo>(`/api/symbols/${encodeURIComponent(name)}`));
+export const fetchSymbol = (name: string) =>
+  isLocal(name) ? localInfo(name) : isTv(name) ? tvInfo(name) : get<SymbolInfo>(`/api/symbols/${encodeURIComponent(name)}`);
 
 export const searchSymbols = (q: string) => get<SymbolInfo[]>('/api/symbols/search', { q, limit: 100 });
 
@@ -284,12 +298,13 @@ export type FeedStatus = 'connecting' | 'live' | 'polling' | 'offline';
 
 /**
  * Live tick feed over the SignalR hub. While the socket is down it falls back
- * to polling /api/latest so prices keep moving.
+ * to polling /api/latest so prices keep moving. `TV:` symbols go to TradingView's socket instead.
  */
 export class TickFeed {
   private conn: signalR.HubConnection;
   private subs = new Set<string>();
   private pollTimer: number | undefined;
+  private tv = new TvFeed();
   onTick: (t: Tick) => void = () => {};
   onStatus: (s: FeedStatus) => void = () => {};
 
@@ -300,6 +315,7 @@ export class TickFeed {
       .withAutomaticReconnect({ nextRetryDelayInMilliseconds: (ctx) => Math.min(1000 * 2 ** ctx.previousRetryCount, 15000) })
       .configureLogging(signalR.LogLevel.Warning)
       .build();
+    this.tv.onTick = (t) => this.onTick(t);
 
     this.conn.on('ReceiveTick', (payload: Tick | Tick[]) => {
       for (const t of Array.isArray(payload) ? payload : [payload]) if (t?.symbol) this.onTick(t);
@@ -329,7 +345,8 @@ export class TickFeed {
 
   /** Replace the subscription set, sending only the difference to the hub. */
   async setSymbols(symbols: string[]) {
-    symbols = symbols.filter((s) => !isLocal(s));
+    this.tv.setSymbols(symbols);
+    symbols = symbols.filter((s) => !isLocal(s) && !isTv(s));
     const next = new Set(symbols);
     const add = symbols.filter((s) => !this.subs.has(s));
     const drop = [...this.subs].filter((s) => !next.has(s));

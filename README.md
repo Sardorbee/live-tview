@@ -34,6 +34,16 @@ The build output goes to `dist/` and is a plain static site, so it can be hosted
 - **CSV import**: load your own history (see below).
 - **Your own indicators** in JavaScript (see below).
 
+## TradingView symbols
+
+Symbols can also come from TradingView's public data socket (the same approach as [Tradingview-ticker](https://github.com/Hattorius/Tradingview-ticker)), with no account. In symbol search, pick the **TradingView** chip or type `EXCHANGE:TICKER`, for example `BINANCE:BTCUSDT`, `OANDA:XAUUSD` or `NASDAQ:AAPL`. They show up as `TV:<EXCHANGE>:<TICKER>` and get live quotes plus history (about 10,000 one-minute bars, more on higher timeframes).
+
+Futures come from TradingView only: use the **Futures** chip, or type a continuous contract such as `CME_MINI:ES1!`, `COMEX:GC1!` or `NYMEX:CL1!` (`1!` is the front month, `2!` the next). CME group futures and some indices are delayed by about 10 minutes; such symbols show a **Delayed** badge on the chart and in the details panel, and a small **D** next to the price in the watchlist. Bar replay works on TradingView symbols too, over the bars that are loaded.
+
+Signed-out access has limits: some exchanges are delayed, seconds and tick charts build up from the live feed only, and TradingView's own symbol search can't be called from another site, so search only knows a short list of popular symbols plus whatever you type.
+
+TradingView only accepts this connection from `localhost` (and its own site), so it works with `npm run dev` / `npm run preview` but not on a deployed copy as is. To use it there, run a small WebSocket relay that forwards to `wss://data.tradingview.com/socket.io/websocket` with the header `Origin: https://www.tradingview.com`, and build with `VITE_TV_SOCKET=wss://your-relay/...`.
+
 ## Importing CSV history
 
 The biquote API only keeps recent history. For deeper history, open symbol search and use **Import CSV folder**.

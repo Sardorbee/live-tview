@@ -1,4 +1,4 @@
-import { bucketEnd, fetchBars, isTickBased, parseTf, tfLabel, type Bar, type BarSet, type SymbolInfo, type Tick, type Timeframe } from './api';
+import { bucketEnd, delayLabel, fetchBars, isTickBased, parseTf, tfLabel, type Bar, type BarSet, type SymbolInfo, type Tick, type Timeframe } from './api';
 import { isLocal } from './localdata';
 import { newId, type InputDef, type InputValue, type Script, type ScriptInstance, type ScriptResult } from './scripts';
 import { CHART_TYPES, ChartView, DOWN, UP, type ChartType, type IndicatorId, type LegendData, type ScaleMode, type TimeRange } from './chartview';
@@ -518,6 +518,8 @@ export class ChartPane {
         : t?.marketState
         ? `<span class="badge ${t.marketState}">${t.marketState === 'open' ? 'Market open' : 'Market closed'}</span>`
         : '';
+    const lag = !this.replay && delayLabel(t);
+    const delayed = lag ? `<span class="badge delayed" title="The data source sends this symbol late; the last bars trail the market by this much">${lag}</span>` : '';
     let ohlc = '';
     if (bar) {
       const d = this.view.digits;
@@ -529,7 +531,7 @@ export class ChartPane {
         .join('')}<span class="${cls(chg)}">${chg >= 0 ? '+' : ''}${fmt(chg, d)} (${pct(chgPct)})</span></span>`;
     }
     this.legend.innerHTML =
-      `<div class="lg-title"><strong>${esc(symbol)}</strong><span class="muted">${esc(desc)}</span>${badge}${ohlc}</div>` +
+      `<div class="lg-title"><strong>${esc(symbol)}</strong><span class="muted">${esc(desc)}</span>${badge}${delayed}${ohlc}</div>` +
       compares
         .map(
           (c) =>

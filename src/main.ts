@@ -1,6 +1,7 @@
 import './style.css';
 import {
   TickFeed,
+  delayLabel,
   fetchCalendar,
   fetchLatest,
   fetchMovers,
@@ -19,6 +20,7 @@ import {
 import { CHART_TYPES, INDICATORS, SCALES, SIZED, tzOffset, type ChartType, type IndicatorId, type ScaleMode } from './chartview';
 import type { Tool } from './drawings';
 import { deleteLocal, importCsv, isLocal, localSymbols } from './localdata';
+import { tvSearch } from './tradingview';
 import { isTyping } from './dom';
 import { ChartPane, type PaneHost, type PaneState } from './pane';
 import { ScriptEditor, openInputs } from './scriptui';
@@ -340,6 +342,8 @@ function updateRow(symbol: string) {
   r.last.textContent = fmt(price, digitsFor(symbol, price));
   r.chg.textContent = pct(t.dayDiffPercent);
   r.chg.className = `wl-chg num ${cls(t.dayDiffPercent)}`;
+  r.last.classList.toggle('delayed', !!t.delay);
+  r.last.title = delayLabel(t);
   if (!Number.isNaN(r.price) && price !== r.price) {
     const flash = price > r.price ? 'flash-up' : 'flash-down';
     r.last.classList.remove('flash-up', 'flash-down');
@@ -363,7 +367,7 @@ function renderDetails() {
   const symbol = activeSymbol();
   const t = ticks.get(symbol);
   const i = infoCache.get(symbol);
-  const head = `<div class="dt-name"><b>${esc(symbol)}</b><span class="badge">${esc(i?.type ?? '')}</span></div><div class="dt-desc">${esc(t?.description || i?.description || '')}</div>`;
+  const head = `<div class="dt-name"><b>${esc(symbol)}</b><span class="badge">${esc(i?.type ?? '')}</span>${delayLabel(t) ? `<span class="badge delayed">${delayLabel(t)}</span>` : ''}</div><div class="dt-desc">${esc(t?.description || i?.description || '')}</div>`;
   if (!t) return void ($('details').innerHTML = `${head}<div class="muted">Waiting for a quote…</div>`);
   const price = priceOf(t);
   const d = digitsFor(symbol, price);
@@ -659,7 +663,7 @@ let searchMode: 'symbol' | 'compare' = 'symbol';
 function openSearch(prefill = '', mode: typeof searchMode = 'symbol') {
   searchMode = mode;
   $('searchModal').classList.remove('hidden');
-  searchInput.placeholder = mode === 'compare' ? `Compare ${activeSymbol()} with…` : 'Search symbol or name';
+  searchInput.placeholder = mode === 'compare' ? `Compare ${activeSymbol()} with…` : 'Search symbol or name, or EXCHANGE:TICKER for TradingView';
   searchInput.value = prefill;
   searchInput.focus();
   renderChips();
@@ -669,7 +673,7 @@ const closeSearch = () => $('searchModal').classList.add('hidden');
 const searchOpen = () => !$('searchModal').classList.contains('hidden');
 
 function renderChips() {
-  $('searchChips').innerHTML = [...SYMBOL_TYPES, 'Imported'].map((t) => `<button data-type="${t}" class="${t === searchType ? 'active' : ''}">${t}</button>`).join('');
+  $('searchChips').innerHTML = [...SYMBOL_TYPES, 'Futures', 'TradingView', 'Imported'].map((t) => `<button data-type="${t}" class="${t === searchType ? 'active' : ''}">${t}</button>`).join('');
 }
 
 async function runSearch() {
@@ -681,8 +685,11 @@ async function runSearch() {
   try {
     if (type === 'Imported') {
       list = [];
+    } else if (type === 'TradingView' || type === 'Futures') {
+      // futures only come from TradingView
+      list = tvSearch(q, type === 'Futures' ? type : undefined);
     } else if (q) {
-      list = (await searchSymbols(q)).filter((s) => !type || s.type === type);
+      list = [...(await searchSymbols(q)).filter((s) => !type || s.type === type), ...tvSearch(q, type)];
     } else {
       const key = type ?? 'All';
       if (!listCache.has(key)) listCache.set(key, await listSymbols(type));

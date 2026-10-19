@@ -667,6 +667,25 @@ button {
   max-height: 78vh;
   overflow-y: auto;
 }
+.badge.delayed {
+  color: #f7a600;
+  background: rgba(247, 166, 0, 0.14);
+}
+/* TradingView-style "D" mark on watchlist prices that come in late */
+.delayed::after {
+  content: 'D';
+  margin-left: 3px;
+  padding: 0 2px;
+  border-radius: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  vertical-align: 1px;
+  color: #f7a600;
+  background: rgba(247, 166, 0, 0.14);
+}
+.badge.delayed::after {
+  content: none;
+}
 .badge.open {
   color: var(--up);
   background: rgba(8, 153, 129, 0.14);
